@@ -1,4 +1,4 @@
-# jetson-containers 테크니컬 매뉴얼
+# dusty-nv/jetson-containers 테크니컬 매뉴얼
 
 2025-11-15, G25DR
 
@@ -40,25 +40,19 @@ JetPack 6.x로의 업그레이드는 `jetson-containers` 사용에 있어 중대
 
 1. Docker는 Ubuntu의 `apt` 저장소가 아닌, **Docker 공식 웹사이트(`get.docker.com`)**를 통해 배포되는 스크립트로 설치해야 한다.11
 
-   Bash
-
-   ```
+   ```Bash
    curl https://get.docker.com | sh
    ```
-
+   
 2. 설치 후, Docker 데몬을 활성화하고 부팅 시 자동 시작되도록 설정한다.11
 
-   Bash
-
-   ```
+   ```Bash
    sudo systemctl --now enable docker
    ```
-
+   
 3. `sudo` 없이 `docker` 명령을 사용하기 위해 현재 사용자를 `docker` 그룹에 추가한다. 이는 필수적인 단계다.11
 
-   Bash
-
-   ```
+   ```Bash
    sudo usermod -aG docker $USER
    newgrp docker 또는 reboot
    ```
@@ -73,35 +67,27 @@ JetPack 6.x에서는 `nvidia-container-toolkit` 관련 라이브러리가 기본
 
 1. NVIDIA Container Toolkit 관련 패키지를 설치한다.11
 
-   Bash
-
-   ```
+   ```Bash
    sudo apt-get update
    sudo apt install -y nvidia-container-toolkit
    ```
-
+   
 2. Docker가 `nvidia` 런타임을 기본으로 사용하도록 구성한다.11
 
-   Bash
-
-   ```
+   ```Bash
    sudo nvidia-ctk runtime configure --runtime=docker
    ```
-
+   
 3. Docker 데몬을 재시작하여 변경 사항을 적용한다.11
 
-   Bash
-
-   ```
+   ```Bash
    sudo systemctl daemon-reload
    sudo systemctl restart docker
    ```
-
+   
 4. 설정이 올바르게 완료되었는지 확인한다. `Runtimes` 항목에 "nvidia"가 표시되어야 한다.9
 
-   Bash
-
-   ```
+   ```Bash
    sudo docker info | grep nvidia
    ```
 
@@ -113,9 +99,7 @@ JetPack 6.x에서는 `nvidia-container-toolkit` 관련 라이브러리가 기본
 
 `jetson-containers`의 설치는 `docker pull`이 아닌 `git clone`으로 시작한다.4 이는 사용자가 완성된 컨테이너 이미지가 아닌, 컨테이너를 *정의하고 생성하는* 전체 엔지니어링 툴킷(Dockerfile, 빌드 스크립트, 패키지 정의)을 로컬에 보유하게 됨을 의미한다.
 
-Bash
-
-```
+```Bash
 git clone https://github.com/dusty-nv/jetson-containers
 ```
 
@@ -123,9 +107,7 @@ git clone https://github.com/dusty-nv/jetson-containers
 
 저장소 복제 후, `install.sh` 스크립트를 실행하여 `jetson-containers` 유틸리티를 설치한다.4
 
-Bash
-
-```
+```Bash
 bash jetson-containers/install.sh
 ```
 
@@ -141,8 +123,6 @@ bash jetson-containers/install.sh
 
 ### 4.1. `jetson-containers build` (빌드)
 
-
-
 이는 사용자가 요청하는 여러 패키지(모듈)를 *조합*하여 새로운 커스텀 Docker 이미지를 동적으로 생성하는 명령어다.4
 
 이 명령어는 프로젝트의 핵심 원칙인 *구성 가능성(Composability)*을 구현한다. 예를 들어, `ros:pytorch` 컨테이너는 `l4t-pytorch`라는 *베이스* 컨테이너 *위에* ROS를 빌드(스태킹)하는 방식으로 정의된다.12 `build` 명령어는 이러한 복잡한 의존성 트리를 해석하고 최적의 빌드 순서를 오케스트레이션한다.
@@ -151,9 +131,7 @@ bash jetson-containers/install.sh
 
 PyTorch, Transformers, 그리고 ROS2 Humble Desktop 버전을 모두 포함하는 단일 컨테이너 my_container를 빌드한다.4
 
-Bash
-
-```
+```Bash
 jetson-containers build --name=my_container pytorch transformers ros:humble-desktop
 ```
 
@@ -161,17 +139,11 @@ jetson-containers build --name=my_container pytorch transformers ros:humble-desk
 
 환경 변수를 통해 특정 CUDA 버전에 맞춰 전체 빌드 스택을 재구성한다.4
 
-Bash
-
-```
+```Bash
 CUDA_VERSION=12.6 jetson-containers build transformers
 ```
 
-
-
 ### 4.2. `autotag` (자동 태그 지정)
-
-
 
 `autotag`는 `jetson-containers`의 가장 핵심적인 자동화 메커니즘이다. 이 유틸리티는 사용자의 현재 JetPack/L4T 버전을 자동으로 감지하고 4, 해당 버전과 호환되는 Docker 이미지 태그를 반환한다.4
 
@@ -185,13 +157,9 @@ CUDA_VERSION=12.6 jetson-containers build transformers
 
 사용 예시:
 
-$(autotag l4t-pytorch)는 현재 L4T 버전에 맞는 l4t-pytorch 태그(예: dustynv/l4t-pytorch:r36.2.0)를 자동으로 찾아 셸 명령어에 전달한다.4
-
-
+`$(autotag l4t-pytorch)`는 현재 L4T 버전에 맞는 l4t-pytorch 태그(예: dustynv/l4t-pytorch:r36.2.0)를 자동으로 찾아 셸 명령어에 전달한다.4
 
 ### 4.3. `jetson-containers run` (실행)
-
-
 
 이 명령어는 표준 `docker run` 명령의 고기능 *래퍼(wrapper)*다.4 이는 단순한 바로가기가 아니라, Jetson 플랫폼의 복잡성을 숨기는 *하드웨어 추상화 계층(Hardware Abstraction Layer, HAL)* 역할을 수행한다.
 
@@ -205,9 +173,7 @@ $(autotag l4t-pytorch)는 현재 L4T 버전에 맞는 l4t-pytorch 태그(예: du
 
 autotag와 연동하여 현재 L4T 버전에 맞는 l4t-pytorch 컨테이너를 즉시 실행한다.
 
-Bash
-
-```
+```Bash
 jetson-containers run $(autotag l4t-pytorch)
 ```
 
@@ -215,25 +181,17 @@ jetson-containers run $(autotag l4t-pytorch)
 
 컨테이너를 실행함과 동시에, 컨테이너 내부에서 특정 명령어(예: ros2 launch)를 실행한다.15
 
-Bash
-
-```
+```Bash
 jetson-containers run $(autotag nano_llm:humble) ros2 launch...
 ```
 
-
-
 ### 4.4. 수동 `docker run` (고급 사용법)
-
-
 
 `jetson-containers` 헬퍼 스크립트를 사용하지 않고, 표준 `docker` 명령으로도 컨테이너를 실행할 수 있다.4
 
 **수동 실행 예시:**
 
-Bash
-
-```
+```Bash
 sudo docker run --runtime nvidia -it --rm --network=host \
   -v /tmp/.X11-unix/:/tmp/.X10-unix -e DISPLAY=$DISPLAY \
   dustynv/l4t-pytorch:r36.2.0
@@ -241,49 +199,29 @@ sudo docker run --runtime nvidia -it --rm --network=host \
 
 그러나 이 경우, 카메라(Argus), 비디오 인코더(enctune), Jetson 모델 정보 등 하드웨어 가속에 필요한 모든 경로를 수동으로 마운트해야 하는 극도의 복잡성이 따른다.14 `jetson-containers run` 유틸리티는 14에 나열된 것과 같은 복잡한 `-v` 마운트 작업을 모두 자동으로 처리하여 사용자를 이러한 복잡성으로부터 해방시킨다.
 
-
-
 ## 섹션 5: 지원 패키지 및 컨테이너 생태계
-
-
 
 `jetson-containers`는 AI, 로보틱스, 비전 처리를 아우르는 방대한 패키지 생태계를 제공한다. 이 패키지들은 `build` 명령어를 통해 조합(composable) 가능하다.
 
-
-
 ### 5.1. AI 및 머신러닝 프레임워크
-
-
 
 - **PyTorch:** `l4t-pytorch`라는 이름으로 제공되며, `torchvision`을 포함한다. JetPack 버전별로 최적화된 사전 빌드 이미지가 존재한다.4
 - **TensorFlow:** `l4t-tensorflow`로 제공된다.4
 - **LLM / VLM:** `vLLM` 4, `SGLang` 4, `transformers` 4, `ollama` 4 등 최신 LLM 서빙 프레임워크와 `NanoLLM` 2 같은 Jetson 최적화 추론 엔진을 광범위하게 지원한다.
 
-
-
 ### 5.2. 로보틱스 (Robotics)
-
-
 
 - **ROS / ROS2:** ROS 1 (Melodic, Noetic) 및 ROS 2 (Foxy, Galactic, Humble, Iron)의 `ros-base` (CLI) 및 `desktop` (GUI 도구 포함) 버전을 모두 지원한다.4
 - **AI-ROS 통합:** 이 프로젝트의 핵심 강점은 **PyTorch가 사전 설치된** ROS 컨테이너(예: `ros:humble-pytorch`)를 제공하는 데 있다.12 이 통합 컨테이너에는 `jetson-inference` 및 `ros_deep_learning` 패키지가 포함되어 있어 18, 로봇 인식(perception) 스택을 즉시 개발할 수 있다.
 - **NVIDIA Isaac ROS:** 하드웨어 가속 ROS 2 패키지인 Isaac ROS 16와의 통합을 지원하며, ROS 2 Humble 기반 컨테이너를 제공한다.19
 
-
-
 ### 5.3. 비전 및 SDK
-
-
 
 - **`jetson-inference`:** imageNet (분류), detectNet (탐지), segNet (분할) 등 C++ 및 Python으로 구현된 고성능 DNN 추론 예제 라이브러리다.8
 - **`DeepStream`:** NVIDIA의 실시간 지능형 비디오 분석(IVA) SDK다.4
 - **기타:** `OpenCV (CUDA 가속 포함)` 4, `ZED SDK` 4 등 주요 비전 라이브러리를 지원한다.
 
-
-
 ### 표 1: `jetson-containers` 주요 지원 패키지 및 모듈
-
-
 
 | **카테고리**      | **패키지명 (예)**                        | **설명**                                                     | **관련 소스** |
 | ----------------- | ---------------------------------------- | ------------------------------------------------------------ | ------------- |
@@ -296,19 +234,11 @@ sudo docker run --runtime nvidia -it --rm --network=host \
 | **비전 SDK**      | `jetson-inference`                       | detectNet, segNet 등 DNN 추론 예제를 포함하는 라이브러리.    | 8             |
 | **비전 SDK**      | `DeepStream`                             | NVIDIA의 실시간 지능형 비디오 분석(IVA) SDK.                 | 9             |
 
-
-
 ## 섹션 6: 실전 적용 가이드
-
-
 
 `jetson-containers`의 실제 사용 사례를 "웹 서비스 배포"와 "임베디드 로보틱스 통합"이라는 두 가지 핵심 아키타입으로 나누어 설명한다.
 
-
-
 ### 6.1. AI 모델 배포: Stable Diffusion WebUI
-
-
 
 이 튜토리얼은 `jetson-containers`를 사용하여 텍스트-이미지 생성 AI 모델을 웹 서비스로 배포하는 과정을 보여준다.22
 
@@ -320,21 +250,15 @@ sudo docker run --runtime nvidia -it --rm --network=host \
 
 - **단계 2. (컨테이너 실행):** `jetson-containers run`과 `autotag`를 사용하여 `stable-diffusion-webui` 컨테이너를 시작한다.22
 
-  Bash
-
-  ```
+  ```Bash
   jetson-containers run $(autotag stable-diffusion-webui)
   ```
-
+  
 - **단계 3. (자동화):** 이 컨테이너는 `--xformers`, `--listen`, `--port=7860` 등의 최적화 플래그와 함께 `launch.py` 스크립트를 자동으로 실행하여 웹 서버를 시작하도록 사전 구성되어 있다.22
 
 - **단계 4. (접근):** 호스트 PC 또는 모바일 기기의 웹 브라우저에서 `http://[Jetson-IP-주소]:7860`으로 접속하여 Stable Diffusion WebUI를 사용한다.22
 
-
-
 ### 6.2. 로보틱스 통합: ROS2 및 생성형 AI (`nano_llm`)
-
-
 
 이 튜토리얼은 `jetson-containers`가 제공하는 추상화의 총합을 보여주는 핵심 예제다. Jetson에 연결된 카메라의 영상을 실시간으로 분석하고, 그 결과를 ROS2 토픽으로 발행하는 생성형 AI 로봇 노드(VLM)를 실행한다.15
 
@@ -344,21 +268,17 @@ sudo docker run --runtime nvidia -it --rm --network=host \
 
 - **단계 1. (하드웨어 확인):** 카메라가 시스템에 올바르게 연결되었는지 확인한다.15
 
-  Bash
-
-  ```
+  ```Bash
   ls /dev/video*
   ```
-
+  
 - **단계 2. (컨테이너 실행 및 노드 론칭):** 단일 명령어를 통해 컨테이너 실행과 ROS2 노드 론칭을 동시에 수행한다.15
 
-  Bash
-
-  ```
+  ```Bash
   jetson-containers run $(autotag nano_llm:humble) \
       ros2 launch ros2_nanollm camera_input_example.launch.py
   ```
-
+  
 - **단계 3. (작동 분석):** 이 단일 명령어는 `jetson-containers`의 모든 추상화(하드웨어 및 소프트웨어)가 동시에 작동하는 완벽한 증거다.
 
   1. **소프트웨어 추상화 (`autotag`):** 현재 L4T 버전에 맞는 `nano_llm:humble` (ROS2 Humble + NanoLLM) 복합 이미지를 자동으로 찾는다.
@@ -368,29 +288,17 @@ sudo docker run --runtime nvidia -it --rm --network=host \
 
 - **단계 4. (ROS2 통합):** VLM이 생성한 이미지 캡션과 오버레이 이미지가 ROS2 토픽으로 실시간 발행된다. 개발자는 RViz, Foxglove 또는 다른 ROS2 노드에서 이 토픽을 구독(subscribe)하여 로봇의 자율 주행이나 작업 계획에 활용할 수 있다.15
 
-
-
 ## 섹션 7: 문제 해결 (Troubleshooting) 및 고급 구성
-
-
 
 NVIDIA 개발자 포럼 및 GitHub 이슈 분석 결과 17, 사용자는 종종 호스트 OS의 문제나 Docker 자체의 설정을 `jetson-containers`의 결함으로 오인하는 경향이 나타난다. 따라서 문제 해결 시 문제의 근원지를 명확히 분류하는 것이 중요하다.
 
-
-
 ### 7.1. 유형 1: 호스트 OS 설정 문제
-
-
 
 - **문제:** Jetson Orin Nano (JetPack 6.x)에서 Chrome/Firefox 등 웹 브라우저가 실행되지 않는다.17
 - **원인:** 이는 `jetson-containers`와 무관한 호스트 Ubuntu OS의 `snapd` 패키지 결함이다.17
 - **해결:** `snapd` 패키지를 특정 리비전으로 다운그레이드하여 문제를 해결한다.17
 
-
-
 ### 7.2. 유형 2: Docker 기본 설정 문제
-
-
 
 - **문제:** `jetson-containers run`으로 실행한 컨테이너가 시스템 재부팅 후 사라지거나 중지된다.17
 - **원인:** 이는 Docker의 기본 동작이다. `run` 명령어는 기본적으로 재시작 정책을 설정하지 않으며, `jetson-containers` 헬퍼는 테스트 편의를 위해 `--rm` (종료 시 삭제) 옵션을 포함할 수 있다.4
@@ -399,30 +307,18 @@ NVIDIA 개발자 포럼 및 GitHub 이슈 분석 결과 17, 사용자는 종종 
 - **원인:** `jetson-containers run`은 사용 편의성(예: ROS2 검색)을 위해 `--network=host` (호스트 네트워크 공유) 4를 기본값으로 사용할 가능성이 높다. 이 모드에서는 컨테이너가 개별 IP를 가질 수 없다.
 - **해결:** 분리된 네트워크(bridge)가 필요하면 `run` 헬퍼를 사용하지 말고, `docker run --network=bridge -p 80:80...` 등 표준 Docker 네트워킹 옵션을 사용하여 수동으로 실행해야 한다.
 
-
-
 ### 7.3. 유형 3: `jetson-containers` 도구 문제
-
-
 
 - **문제:** `autotag`가 호환되는 이미지를 찾지 못하고 빌드를 시도하다가 실패한다.13
 - **원인:** (a) 사용 중인 JetPack 버전이 공식 지원(JP 6.2, 7.x) 4 범위를 벗어남. (b) `git clone`한 로컬 저장소가 최신이 아님. (c) 특정 패키지가 해당 L4T 버전을 (아직) 지원하지 않음.
 - **해결:** `jetson-containers` 디렉토리에서 `git pull`을 실행하여 저장소를 최신 상태로 업데이트하고, 지원되는 JetPack 버전을 사용 중인지 재확인한다.
 
-
-
 ### 7.4. 공식 지원 채널
-
-
 
 - **GitHub Issues:** `jetson-containers` 도구 자체의 버그, 빌드 스크립트 실패, 패키지 지원 요청 등은 공식 GitHub Issues 23를 통해 보고하고 검색하는 것이 가장 효율적이다.
 - **NVIDIA 개발자 포럼:** JetPack 설치, Docker/CTK 설정, 카메라 등 하드웨어 드라이버 문제, `snapd` 오류 등 전반적인 Jetson 플랫폼 문제는 NVIDIA 개발자 포럼 17이 더 적합하다.
 
-
-
 ## 섹션 8: 결론
-
-
 
 `jetson-containers`는 NVIDIA Jetson 플랫폼에서 현대적인 AI 및 로보틱스 애플리케이션을 개발하는 데 필수적인 핵심 도구로 자리매김했다. 이는 NVIDIA의 "클라우드 네이티브" 비전 16과, 급변하는 ML 커뮤니티의 혁신 속도 3, 그리고 임베디드 하드웨어의 파편화된 현실 14 사이의 간극을 메우는 강력한 브릿지 역할을 수행한다.
 
