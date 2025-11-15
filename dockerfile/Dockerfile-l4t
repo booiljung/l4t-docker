@@ -1,0 +1,133 @@
+# ==========================================================
+# 스테이지 1: OpenCV 빌더
+# (L4T CUDA 이미지를 기반으로 하여 CUDA/cuDNN 헤더에 접근)
+# ==========================================================
+FROM nvcr.io/nvidia/l4t-cuda:12.2.x AS opencv_builder
+
+ARG OPENCV_VERSION="4.10.0"
+
+# GStreamer 및 빌드 의존성 설치
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential cmake git ninja-build pkg-config \
+    libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
+    libgstreamer-plugins-good1.0-dev libgstreamer-plugins-bad1.0-dev \
+    libjpeg-dev libpng-dev libtiff-dev libv4l-dev v4l-utils \
+    libavcodec-dev libavformat-dev libswscale-dev libdc1394-dev \
+    libgtk2.0-dev libtbb-dev libeigen3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /tmp/opencv_build
+RUN curl -L https://github.com/opencv/opencv/archive/${OPENCV_VERSION}.zip -o opencv.zip \
+    && curl -L https://github.com/opencv/opencv_contrib/archive/${OPENCV_VERSION}.zip -o opencv_contrib.zip \
+    && unzip opencv.zip && unzip opencv_contrib.zip
+
+WORKDIR /tmp/opencv_build/opencv-${OPENCV_VERSION}/build
+RUN cmake.. \
+        -D CMAKE_BUILD_TYPE=RELEASE \
+        -D CMAKE_INSTALL_PREFIX=/usr/local/opencv_staging \
+        -D OPENCV_EXTRA_MODULES_PATH=../../opencv_contrib-${OPENCV_VERSION}/modules \
+        -D WITH_CUDA=ON \
+        -D WITH_CUDNN=ON \
+        -D CUDA_ARCH_BIN="8.7" \        # Orin 전용 최적화 [1, 2, 3]
+        -D CUDA_ARCH_PTX="" \
+        -D WITH_GSTREAMER=ON \         # [필수] Jetson 하드웨어 가속 [4, 5, 6]
+        -D WITH_LIBV4L=ON \
+        -D BUILD_opencv_python3=ON \
+        -D OPENCV_GENERATE_PKGCONFIG=ON \
+        -D BUILD_TESTS=OFF \
+        -D BUILD_PERF_TESTS=OFF \
+        -D BUILD_EXAMPLES=OFF
+RUN make -j$(($(nproc) - 1))
+RUN make install
+
+# ==========================================================
+# 스테이지 2: 최종 이미지
+# (Open3D 빌더 스테이지는 사용자의 요청에 따라 제거됨)
+# ==========================================================
+FROM nvcr.io/nvidia/l4t-cuda:12.2.x-py3
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
+
+# ROS & Gazebo 저장소 추가
+RUN apt-get update && apt-get install -y curl gnupg lsb-release sudo locales \
+    && locale-gen en_US.UTF-8
+RUN curl -sSL https://raw.githubusercontent.com/ros/rosdistro/master/ros.key -o /usr/share/keyrings/ros-archive-keyring.gpg
+RUN echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] http://packages.ros.org/ros2/ubuntu $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/ros2.list > /dev/null [7]
+RUN curl https://packages.osrfoundation.org/gazebo.gpg --output /usr/share/keyrings/pkgs-osrf-archive-keyring.gpg
+RUN echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/pkgs-osrf-archive-keyring.gpg] http://packages.osrfoundation.org/gazebo/ubuntu-stable $(lsb_release -cs) main" | tee /etc/apt/sources.list.d/gazebo-stable.list > /dev/null
+
+# APT 패키지 설치 (MESA 관련 패키지 *완전 제외*)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential cmake git ninja-build pkg-config \
+    python3-pip python3-venv python3-dev gosu libfuse2 \
+    gfortran libopenblas-dev liblapack-dev \
+    # ROS 2
+    ros-humble-desktop-full \
+    python3-rosdep python3-colcon-common-extensions \
+    # ROS 2 Utils
+    ros-humble-plotjuggler-ros ros-humble-rqt-image-view \
+    # Gazebo Harmonic
+    ros-humble-ros-gz-sim- ros-humble-ros-gzharmonic [8] \
+    # PCL/VTK (APT 버전)
+    libpcl-dev [9, 10] libvtk9-dev [11] \
+    # GStreamer (런타임)
+    gstreamer1.0-plugins-base gstreamer1.0-plugins-good \
+    gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly gstreamer1.0-libav \
+    # 기타 의존성
+    libboost-all-dev libeigen3-dev libyaml-cpp-dev \
+    libjpeg-dev libpng-dev libavcodec-dev libavformat-dev libswscale-dev \
+    libtbb-dev libtiff-dev libv4l-dev v4l-utils \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+RUN rosdep init && rosdep update --rosdistro humble
+
+# 빌드된 OpenCV 복사
+COPY --from=opencv_builder /usr/local/opencv_staging /usr/local
+RUN ldconfig
+
+# Micro-XRCE-DDS-Agent & Livox-SDK
+RUN git clone https://github.com/eProsima/Micro-XRCE-DDS-Agent.git /tmp/Micro-XRCE-DDS-Agent \
+    && cd /tmp/Micro-XRCE-DDS-Agent && mkdir build && cd build \
+    && cmake.. && make install && ldconfig && rm -rf /tmp/Micro-XRCE-DDS-Agent
+RUN git clone https://github.com/Livox-SDK/Livox-SDK2.git /tmp/Livox-SDK2 \
+    && cd /tmp/Livox-SDK2 && mkdir build && cd build \
+    && cmake.. && make install && rm -rf /tmp/Livox-SDK2
+
+# 사용자 생성
+ARG USERNAME=px4User
+ARG USER_UID=1000
+ARG USER_GID=1000
+RUN groupadd --gid $USER_GID $USERNAME
+RUN useradd --uid $USER_UID --gid $USER_GID -m -s /bin/bash $USERNAME
+RUN usermod -aG sudo,video,render,dialout $USERNAME
+RUN echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+USER $USERNAME
+WORKDIR /home/$USERNAME
+
+# PIP 패키지 설치
+RUN pip3 install --no-cache-dir -U \
+        empy==3.3.4 \
+        setuptools==58.0.4 \
+        scipy \
+        scikit-learn \
+        pyros-genmsg \
+        open3d # [사용자 요청] 저장소(PyPI)에서 직접 설치 [12, 13, 14]
+
+# PX4 클론 및 빌드
+RUN git clone --recursive https://github.com/PX4/PX4-Autopilot.git /home/$USERNAME/ros2_ws/src/PX4-Autopilot \
+    && cd /home/$USERNAME/ros2_ws/src/PX4-Autopilot \
+    && git checkout v1.16.0 \
+    && git submodule update --init --recursive
+# PX4의 Python 의존성 설치 (ubuntu.sh 대신)
+RUN pip3 install --no-cache-dir -r /home/$USERNAME/ros2_ws/src/PX4-Autopilot/Tools/setup/requirements.txt
+RUN ccache make px4_sitl
+
+# 환경 변수 설정
+RUN echo "source /opt/ros/humble/setup.bash" >> ~/.bashrc
+RUN echo "export LD_LIBRARY_PATH=/usr/local/lib:\$LD_LIBRARY_PATH" >> ~/.bashrc
+#... 기타 환경 변수...
+
+CMD ["bash"]
