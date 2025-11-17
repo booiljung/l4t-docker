@@ -63,15 +63,15 @@ $ jetson-containers build --name=agx_orin/ros:humble-base ros:humble-desktop
 GPU 가속을 컨테이너 내부에서 사용하기 위해 Docker 런타임이 NVIDIA Container Runtime을 사용하도록 명시적으로 설정해야 한다. 이 설정이 누락되면 컨테이너는 GPU를 인지하지 못하거나, 3D 렌더링 시 OpenGL 관련 오류를 발생시킨다 . NVIDIA는 최신 버전에서 `nvidia-ctk` 명령을 사용하여 이 구성을 표준화했다.
 
 1. **Docker 데몬 설정 변경:** `nvidia-ctk` 명령을 사용하여 Docker가 NVIDIA Container Runtime을 기본 런타임으로 사용하도록 `/etc/docker/daemon.json` 파일을 수정하라 .
-
+   
    ```Bash
    $ sudo nvidia-ctk runtime configure --runtime=docker
    ```
-
+   
    이 과정은 Docker가 컨테이너 실행 시 필요한 NVIDIA 라이브러리 및 드라이버를 자동으로 마운트할 수 있도록 보장한다 .
 
 2. **Docker 데몬 재시작:** 변경 사항을 적용하기 위해 Docker 서비스를 재시작하라 .
-
+   
    ```Bash
    $ sudo systemctl restart docker
    ```
@@ -83,12 +83,12 @@ GPU 가속을 컨테이너 내부에서 사용하기 위해 Docker 런타임이 
 VTK와 Qt5를 통해 렌더링된 GUI (RViZ2 또는 PCL Visualizer)를 호스트 AGX Orin의 화면에 출력하려면 X11 포워딩 메커니즘을 설정해야 한다.
 
 1. **X Server 접근 권한 부여:** 컨테이너 내부의 사용자(일반적으로 `root` 또는 `dustynv` 유저)가 호스트 시스템의 X 서버에 GUI를 출력할 수 있도록 권한을 부여하라 .
-
+   
    ```Bash
    # 호스트 Jetson AGX Orin에서 실행
    $ xhost +si:localuser:root
    ```
-
+   
    이 명령은 컨테이너가 호스트의 디스플레이 소켓에 접근하는 것을 명시적으로 허용하여 런타임 시 발생하는 X11 권한 오류를 방지한다.7
 
 2. **컨테이너 실행 시 환경 변수 설정:** 컨테이너를 실행할 때 X11 관련 환경 변수 (`DISPLAY`)와 X11 소켓 볼륨 마운트 (`/tmp/.X11-unix`)가 반드시 포함되어야 한다. 또한, Qt 기반 애플리케이션에서 발생할 수 있는 X11 공유 메모리 관련 문제를 완화하기 위해 `QT_X11_NO_MITSHM=1` 환경 변수를 설정하는 것이 권장된다 .
@@ -219,14 +219,14 @@ PCL/VTK/Qt5를 성공적으로 통합했는지 확인하는 최종 단계는 컨
 
 통합된 이미지 (`agx_orin/ros2_pcl_integrated:latest`)를 실행할 때, GUI 출력과 GPU 가속을 위해 필수적인 인자들을 정확하게 전달해야 한다 .
 
-| **필수 Docker 런타임 인자** | **설정/구성**                                            | **목적**                                                     | **참조** |
-| --------------------------- | -------------------------------------------------------- | ------------------------------------------------------------ | -------- |
-| Runtime                     | `--runtime nvidia`                                       | 컨테이너가 호스트의 NVIDIA GPU 드라이버 및 CUDA 라이브러리에 접근할 수 있도록 지정한다 . | 7        |
-| Network & IPC               | `--net=host --ipc=host`                                  | ROS2 통신 및 성능 최적화를 위해 호스트 네트워킹과 IPC 네임스페이스를 공유한다.7 | 7        |
-| Display                     | `-e DISPLAY=$DISPLAY`                                    | 호스트 X 서버의 DISPLAY 환경 변수를 컨테이너에 전달한다.7    | 7        |
-| X11 Volume Mount            | `-v /tmp/.X11-unix:/tmp/.X11-unix:rw`                    | X 서버와 통신하는 데 사용되는 UNIX 도메인 소켓을 컨테이너에 마운트한다 . | 7        |
-| Qt X11 Mitigation           | `-e QT_X11_NO_MITSHM=1`                                  | Qt 기반 애플리케이션(RViZ2)에서 발생할 수 있는 X11 공유 메모리 충돌을 예방한다.7 | 7        |
-| GPU Capabilities            | `-e NVIDIA_DRIVER_CAPABILITIES=graphics,utility,compute` | VTK/Qt/RViZ2의 3D 렌더링에 필요한 그래픽 및 컴퓨팅 기능을 명시적으로 요청한다 . | 7        |
+| **필수 Docker 런타임 인자** | **설정/구성**                                                | **목적**                                                    | **참조** |
+| -------------------- | -------------------------------------------------------- | --------------------------------------------------------- | ------ |
+| Runtime              | `--runtime nvidia`                                       | 컨테이너가 호스트의 NVIDIA GPU 드라이버 및 CUDA 라이브러리에 접근할 수 있도록 지정한다 . | 7      |
+| Network & IPC        | `--net=host --ipc=host`                                  | ROS2 통신 및 성능 최적화를 위해 호스트 네트워킹과 IPC 네임스페이스를 공유한다.7         | 7      |
+| Display              | `-e DISPLAY=$DISPLAY`                                    | 호스트 X 서버의 DISPLAY 환경 변수를 컨테이너에 전달한다.7                     | 7      |
+| X11 Volume Mount     | `-v /tmp/.X11-unix:/tmp/.X11-unix:rw`                    | X 서버와 통신하는 데 사용되는 UNIX 도메인 소켓을 컨테이너에 마운트한다 .              | 7      |
+| Qt X11 Mitigation    | `-e QT_X11_NO_MITSHM=1`                                  | Qt 기반 애플리케이션(RViZ2)에서 발생할 수 있는 X11 공유 메모리 충돌을 예방한다.7      | 7      |
+| GPU Capabilities     | `-e NVIDIA_DRIVER_CAPABILITIES=graphics,utility,compute` | VTK/Qt/RViZ2의 3D 렌더링에 필요한 그래픽 및 컴퓨팅 기능을 명시적으로 요청한다 .      | 7      |
 
 #### 통합 컨테이너 이미지 구동 명령
 
@@ -258,14 +258,14 @@ docker run --rm -it \
 
 이 보고서에서 제시된 프로세스를 통해 구축된 통합 컨테이너 이미지는 NVIDIA Jetson AGX Orin의 성능을 극대화하는 재현 가능한 고성능 3D 인지 환경을 제공한다.
 
-| **통합 컨테이너 스택 사양** | **구성 요소**             | **통합 세부 사항**                                           |
-| --------------------------- | ------------------------- | ------------------------------------------------------------ |
-| **플랫폼 호환성**           | Jetson AGX Orin           | JetPack 6.x (L4T R36.x), CUDA 12.x 기반 .                    |
-| **로보틱스 미들웨어**       | ROS2 Humble Desktop       | Ubuntu 22.04 기반의 표준 설치 (RViZ2 포함).1                 |
-| **3D 인지 엔진**            | PCL (Point Cloud Library) | `libpcl-dev` 기반 C++ 통합 및 cuPCL 모듈을 통한 GPU 가속 구현.8 |
-| **시각화 엔진**             | VTK 9.x                   | Qt5 및 OpenGL 지원을 명시적으로 활성화하는 소스 컴파일.10    |
-| **GUI 프레임워크**          | Qt5                       | VTK 컴파일에 필요한 개발 헤더 및 런타임 환경 제공 .          |
-| **가속 설정**               | Docker Runtime            | `--runtime nvidia` 및 X11 포워딩 완벽 설정 .                 |
+| **통합 컨테이너 스택 사양** | **구성 요소**                 | **통합 세부 사항**                                      |
+| ----------------- | ------------------------- | ------------------------------------------------- |
+| **플랫폼 호환성**       | Jetson AGX Orin           | JetPack 6.x (L4T R36.x), CUDA 12.x 기반 .           |
+| **로보틱스 미들웨어**     | ROS2 Humble Desktop       | Ubuntu 22.04 기반의 표준 설치 (RViZ2 포함).1               |
+| **3D 인지 엔진**      | PCL (Point Cloud Library) | `libpcl-dev` 기반 C++ 통합 및 cuPCL 모듈을 통한 GPU 가속 구현.8 |
+| **시각화 엔진**        | VTK 9.x                   | Qt5 및 OpenGL 지원을 명시적으로 활성화하는 소스 컴파일.10            |
+| **GUI 프레임워크**     | Qt5                       | VTK 컴파일에 필요한 개발 헤더 및 런타임 환경 제공 .                  |
+| **가속 설정**         | Docker Runtime            | `--runtime nvidia` 및 X11 포워딩 완벽 설정 .              |
 
 이 통합 이미지는 특히 복잡한 PCL 알고리즘의 GPU 가속 처리와 Qt5/VTK 기반의 안정적인 3D 디버깅 시각화를 동시에 요구하는 로봇 애플리케이션에 최적화된 환경을 구축한다.
 
@@ -304,4 +304,3 @@ AGX Orin은 강력한 SoC이지만, 복잡한 소스 컴파일 과정(특히 VTK
 15. Help with ROS 2 Humble Dev Container on NVIDIA AGX THOR - Jetson Thor, 11월 15, 2025에 액세스, https://forums.developer.nvidia.com/t/help-with-ros-2-humble-dev-container-on-nvidia-agx-thor/345815
 16. Creating Docker Image for NVIDIA® Jetson™ with OpenCV - Stereolabs, 11월 15, 2025에 액세스, https://www.stereolabs.com/docs/docker/opencv-ros-images-for-jetson
 17. Quick Start Guide — NVIDIA AI Enterprise, 11월 15, 2025에 액세스, https://docs.nvidia.com/ai-enterprise/release-6/6.2/getting-started/quick-start-guide.html
-
